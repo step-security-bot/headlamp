@@ -11,6 +11,7 @@ import open from 'open';
 import path from 'path';
 import url from 'url';
 import yargs from 'yargs';
+import PluginManager from '../../plugins/headlamp-plugin/plugin-management-utils';
 import i18n from './i18next.config';
 import windowSize from './windowSize';
 
@@ -47,6 +48,83 @@ const buildManifest = fs.existsSync(manifestFile) ? require(manifestFile) : {};
 
 // make it global so that it doesn't get garbage collected
 let mainWindow: BrowserWindow | null;
+
+class PluginManagerEventListeners {
+  private abortControllers: {};
+
+  constructor() {
+    this.abortControllers = {};
+  }
+
+  setupEventHandlers() {
+    ipcMain.on('install-plugin', (event, identifier, URL, destinationFolder, headlampVersion) => {
+      const controller = new AbortController();
+      const cancelSignal = controller.signal;
+      this.abortControllers[identifier] = controller;
+
+      PluginManager.install(
+        URL,
+        destinationFolder,
+        headlampVersion,
+        progressData => {
+          if (cancelSignal.aborted) {
+            return;
+          }
+          event.sender.send('install-plugin-progress', progressData);
+          if (progressData.type === 'success' || progressData.type === 'error') {
+            delete this.abortControllers[identifier];
+          }
+        },
+        cancelSignal
+      );
+    });
+
+    ipcMain.on(
+      'update-plugin',
+      (event, identifier, pluginName, destinationFolder, headlampVersion) => {
+        const controller = new AbortController();
+        const cancelSignal = controller.signal;
+        this.abortControllers[identifier] = controller;
+
+        PluginManager.update(
+          pluginName,
+          destinationFolder,
+          headlampVersion,
+          progressData => {
+            if (cancelSignal.aborted) {
+              return;
+            }
+            event.sender.send('update-plugin-progress', progressData);
+            if (progressData.type === 'success' || progressData.type === 'error') {
+              delete this.abortControllers[identifier];
+            }
+          },
+          cancelSignal
+        );
+      }
+    );
+
+    ipcMain.on('uninstall-plugin', (event, pluginName) => {
+      PluginManager.uninstall(pluginName, undefined, progressData => {
+        event.sender.send('uninstall-plugin-progress', progressData);
+      });
+    });
+
+    ipcMain.on('list-plugins', (event, folder) => {
+      PluginManager.list(folder, progressData => {
+        event.sender.send('list-plugins', progressData);
+      });
+    });
+
+    ipcMain.on('cancel-plugin-process', (event, identifier) => {
+      if (this.abortControllers[identifier]) {
+        const controller = this.abortControllers[identifier];
+        controller.abort();
+        delete this.abortControllers[identifier];
+      }
+    });
+  }
+}
 
 function startServer(flags: string[] = []): ChildProcessWithoutNullStreams {
   const serverFilePath = isDev
@@ -707,6 +785,8 @@ function startElecron() {
     }
 
     ipcMain.on('run-command', handleRunCommand);
+
+    new PluginManagerEventListeners().setupEventHandlers();
 
     if (!useExternalServer) {
       const runningHeadlamp = await getRunningHeadlampPIDs();
