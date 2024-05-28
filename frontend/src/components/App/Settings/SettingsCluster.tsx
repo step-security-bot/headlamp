@@ -243,6 +243,62 @@ export default function SettingsCluster() {
           ],
         }}
       >
+        {helpers.isElectron() && (
+          <NameValueTable
+            rows={[
+              {
+                name: t('translation|Name'),
+                value: (
+                  <TextField
+                    onChange={event => {
+                      let value = event.target.value;
+                      value = value.replace(' ', '');
+                      setNewClusterName(value);
+                    }}
+                    value={newClusterName}
+                    placeholder={cluster}
+                    error={!isValidCurrentName}
+                    helperText={
+                      isValidCurrentName
+                        ? t(
+                            'translation|The current name of cluster. You can define custom modified name.'
+                          )
+                        : invalidClusterNameMessage
+                    }
+                    InputProps={{
+                      endAdornment: (
+                        <Box pt={2} textAlign="right">
+                          <ConfirmButton
+                            onConfirm={() => {
+                              if (isValidCurrentName) {
+                                handleUpdateClusterName(source);
+                              }
+                            }}
+                            confirmTitle={t('translation|Change name')}
+                            confirmDescription={t(
+                              'translation|Are you sure you want to change the name for "{{ clusterName }}"?',
+                              { clusterName: cluster }
+                            )}
+                            disabled={!newClusterName || !isValidCurrentName}
+                          >
+                            {t('translation|Apply')}
+                          </ConfirmButton>
+                        </Box>
+                      ),
+                      onKeyPress: event => {
+                        if (event.key === 'Enter' && isValidCurrentName) {
+                          handleUpdateClusterName(source);
+                        }
+                      },
+                      autoComplete: 'off',
+                      sx: { maxWidth: 250 },
+                    }}
+                  />
+                ),
+              },
+            ]}
+          />
+        )}
         <NameValueTable
           rows={[
             {
@@ -356,56 +412,6 @@ export default function SettingsCluster() {
                     ))}
                   </Box>
                 </>
-              ),
-            },
-            {
-              name: t('translation|Current name'),
-              value: (
-                <TextField
-                  onChange={event => {
-                    let value = event.target.value;
-                    value = value.replace(' ', '');
-                    setNewClusterName(value);
-                  }}
-                  value={newClusterName}
-                  placeholder={cluster}
-                  error={!isValidCurrentName}
-                  helperText={
-                    isValidCurrentName
-                      ? t(
-                          'translation|The current name of cluster. You can define custom modified name.'
-                        )
-                      : invalidClusterNameMessage
-                  }
-                  InputProps={{
-                    endAdornment: (
-                      <Box pt={2} textAlign="right">
-                        <ConfirmButton
-                          color="secondary"
-                          onConfirm={() => {
-                            if (isValidCurrentName) {
-                              handleUpdateClusterName(source);
-                            }
-                          }}
-                          confirmTitle={t('translation|Change name')}
-                          confirmDescription={t(
-                            'translation|Are you sure you want to change the name for "{{ clusterName }}"?',
-                            { clusterName: cluster }
-                          )}
-                          disabled={!newClusterName || !isValidCurrentName}
-                        >
-                          {t('translation|Change name')}
-                        </ConfirmButton>
-                      </Box>
-                    ),
-                    onKeyPress: event => {
-                      if (event.key === 'Enter' && isValidCurrentName) {
-                        handleUpdateClusterName(source);
-                      }
-                    },
-                    autoComplete: 'off',
-                  }}
-                />
               ),
             },
           ]}
